@@ -362,6 +362,7 @@
     <form id="auth-login" class="auth-view on" onsubmit="return false">
       <div class="auth-field"><label>Correo</label><input type="email" id="auth-email" autocomplete="username" required></div>
       <div class="auth-field"><label>Contraseña</label><input type="password" id="auth-pass" autocomplete="current-password" required></div>
+      <label class="switch" style="margin-bottom:16px"><input type="checkbox" id="auth-remember"><span class="track"></span>Recordarme en este dispositivo</label>
       <button class="btn primary big" style="width:100%" data-action="auth-login">Entrar</button>
       <div class="auth-links">
         <button type="button" data-action="auth-show-forgot">¿Olvidaste tu contraseña?</button>
@@ -2340,9 +2341,19 @@ function toast(msg){
    11. ACCESO (Supabase Auth) — solo la instructora puede entrar
    ============================================================ */
 const ALLOWED_EMAIL = "salvarezdelfin@gmail.com";
+/* "Recordarme": si no se marca, la sesión vive en sessionStorage (se borra al cerrar
+   la pestaña/navegador y vuelve a pedir contraseña); si se marca, va a localStorage
+   y sobrevive entre visitas, como antes. */
+let rememberMe = false;
+const authStorage = {
+  getItem:(k)=>{ try{ return localStorage.getItem(k) ?? sessionStorage.getItem(k); }catch(e){ return null; } },
+  setItem:(k,v)=>{ try{ if(rememberMe){ localStorage.setItem(k,v); sessionStorage.removeItem(k); } else { sessionStorage.setItem(k,v); localStorage.removeItem(k); } }catch(e){} },
+  removeItem:(k)=>{ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch(e){} },
+};
 const sbAuth = window.supabase.createClient(
   "https://smjktuithhvfmexysvkf.supabase.co",
-  "sb_publishable_h7YxlJXIADT1827fFx6hyg_jtjmnmGZ"
+  "sb_publishable_h7YxlJXIADT1827fFx6hyg_jtjmnmGZ",
+  {auth:{storage:authStorage,persistSession:true,autoRefreshToken:true}}
 );
 function authView(name){
   document.querySelectorAll(".auth-view").forEach(v=>v.classList.remove("on"));
@@ -2382,6 +2393,7 @@ document.getElementById("authgate").addEventListener("click",e=>{
     const email=document.getElementById("auth-email").value.trim();
     const pass=document.getElementById("auth-pass").value;
     if(email.toLowerCase()!==ALLOWED_EMAIL){ authMsg("Este acceso es privado."); return; }
+    rememberMe=document.getElementById("auth-remember").checked;
     t.disabled=true; t.textContent="Entrando…";
     sbAuth.auth.signInWithPassword({email,password:pass}).then(({data,error})=>{
       t.disabled=false; t.textContent="Entrar";
@@ -2394,6 +2406,7 @@ document.getElementById("authgate").addEventListener("click",e=>{
     const email=document.getElementById("signup-email").value.trim();
     const pass=document.getElementById("signup-pass").value;
     if(email.toLowerCase()!==ALLOWED_EMAIL){ authMsg("Este acceso es privado."); return; }
+    rememberMe=true;
     t.disabled=true; t.textContent="Creando…";
     sbAuth.auth.signUp({email,password:pass}).then(({data,error})=>{
       t.disabled=false; t.textContent="Crear cuenta";
@@ -2415,6 +2428,7 @@ document.getElementById("authgate").addEventListener("click",e=>{
   }
   if(a==="auth-reset"){
     const pass=document.getElementById("reset-pass").value;
+    rememberMe=true;
     t.disabled=true; t.textContent="Guardando…";
     sbAuth.auth.updateUser({password:pass}).then(({error})=>{
       t.disabled=false; t.textContent="Guardar contraseña";
